@@ -1,4 +1,5 @@
 import { Event } from '@sentry/types';
+import { computeTracestate } from '@sentry/utils';
 
 import { API } from '../../src/api';
 import { eventToSentryRequest } from '../../src/request';
@@ -24,17 +25,22 @@ describe('eventToSentryRequest', () => {
   it('correctly handles transaction events', () => {
     const eventId = '1231201211212012';
     const traceId = '0908201304152013';
+    const environment = 'dogpark';
+    const release = 'off.leash.park';
+
     const event = {
       contexts: { trace: { trace_id: traceId, span_id: '12261980', op: 'pageload' } },
-      environment: 'dogpark',
+      environment,
       event_id: eventId,
-      release: 'off.leash.park',
+      release,
       spans: [],
-      tracestate:
-        'ewAiAGUAbgB2AGkAcgBvAG4AbQBlAG4AdAAiADoAIgBkAG8AZwBwAGEAcgBrACIALAAiAHAAdQBiAGwAaQBjAF8AawBlAHkAIgA6ACIA' +
-        'ZABvAGcAcwBhAHIAZQBiAGEAZABhAHQAawBlAGUAcABpAG4AZwBzAGUAYwByAGUAdABzACIALAAiAHIAZQBsAGUAYQBzAGUAIgA6ACIA' +
-        'bwBmAGYALgBsAGUAYQBzAGgALgBwAGEAcgBrACIAfQA.',
       transaction: '/dogs/are/great/',
+      tracestate: computeTracestate({
+        trace_id: traceId,
+        environment,
+        public_key: 'dogsarebadatkeepingsecrets',
+        release,
+      }),
       type: 'transaction',
       user: { id: '1121', username: 'CharlieDog', ip_address: '11.21.20.12' },
     };
@@ -53,15 +59,16 @@ describe('eventToSentryRequest', () => {
     expect(result.url).toEqual(
       'https://squirrelchasers.ingest.sentry.io/api/12312012/envelope/?sentry_key=dogsarebadatkeepingsecrets&sentry_version=7',
     );
+
     expect(envelope.envelopeHeader).toEqual({
       event_id: eventId,
       sent_at: expect.any(String),
-      trace_id: traceId,
-      trace: JSON.stringify({
-        environment: 'dogpark',
+      trace: {
+        trace_id: traceId,
+        environment,
         public_key: 'dogsarebadatkeepingsecrets',
-        release: 'off.leash.park',
-      }),
+        release,
+      },
     });
     expect(envelope.itemHeader).toEqual({ type: 'transaction' });
     expect(envelope.event).toEqual(event);
