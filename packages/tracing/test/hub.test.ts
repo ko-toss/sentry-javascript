@@ -3,10 +3,9 @@ import { BrowserClient } from '@sentry/browser';
 import { getMainCarrier, Hub } from '@sentry/hub';
 import * as hubModule from '@sentry/hub';
 import * as utilsModule from '@sentry/utils'; // for mocking
-import { base64ToUnicode, getGlobalObject, isNodeEnv, logger } from '@sentry/utils';
+import { base64ToUnicode, computeTracestate, getGlobalObject, isNodeEnv, logger } from '@sentry/utils';
 import * as nodeHttpModule from 'http';
 
-import { Transaction } from '../src';
 import { BrowserTracing } from '../src/browser/browsertracing';
 import { addExtensionMethods } from '../src/hubextensions';
 import { extractTraceparentData, TRACEPARENT_REGEXP } from '../src/utils';
@@ -46,28 +45,27 @@ describe('Hub', () => {
       expect(transaction).toEqual(expect.objectContaining(transactionContext));
     });
 
-    it('creates a new tracestate value (with the right data) if not given one in transaction context', () => {
+    it('creates a new tracestate value if not given one in transaction context', () => {
+      const environment = 'dogpark';
+      const release = 'off.leash.park';
       const hub = new Hub(
         new BrowserClient({
           dsn: 'https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012',
           tracesSampleRate: 1,
-          release: 'off.leash.park',
-          environment: 'dogpark',
+          release,
+          environment,
         }),
       );
       const transaction = hub.startTransaction({ name: 'FETCH /ball' });
 
-      const b64Value =
-        'ewAiAHAAdQBiAGwAaQBjAF8AawBlAHkAIgA6ACIAZABvAGcAcwBhAHIAZQBiAGEAZABhAHQAawBlAGUAcA' +
-        'BpAG4AZwBzAGUAYwByAGUAdABzACIALAAiAGUAbgB2AGkAcgBvAG4AbQBlAG4AdAAiADoAIgBkAG8AZwBwAGEAcgBrACIALAAiA' +
-        'HIAZQBsAGUAYQBzAGUAIgA6ACIAbwBmAGYALgBsAGUAYQBzAGgALgBwAGEAcgBrACIAfQA.';
+      const b64Value = computeTracestate({
+        trace_id: transaction.traceId,
+        environment,
+        release,
+        public_key: 'dogsarebadatkeepingsecrets',
+      });
 
       expect(transaction.tracestate).toEqual(b64Value);
-      expect(JSON.parse(base64ToUnicode(b64Value.replace('.', '=')))).toEqual({
-        environment: 'dogpark',
-        public_key: 'dogsarebadatkeepingsecrets',
-        release: 'off.leash.park',
-      });
     });
   });
 
